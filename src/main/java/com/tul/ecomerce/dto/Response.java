@@ -1,12 +1,13 @@
 package com.tul.ecomerce.dto;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Response {
 	
 	private String mensaje;
-	private List<?> data;
-	private List<?> errores;
+	private List<?> data = new ArrayList<>();
+	private List<?> errores = new ArrayList<>();;
 	public String getMensaje() {
 		return mensaje;
 	}

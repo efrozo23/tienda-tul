@@ -18,6 +18,7 @@ public class Producto {
 	@Id
 	@GeneratedValue(generator = "uuid2")
 	@GenericGenerator(name = "uuid2", strategy = "org.hibernate.id.UUIDGenerator")
+	@Column(name = "id")
 	private String id;
 
 	@NotBlank
@@ -36,6 +37,17 @@ public class Producto {
 	@Column(name = "tipo_producto")
 	@EnumName(enumClass =  TipoProducto.class)
 	private  String tipoProducto;
+	
+	
+	
+	
+	public Producto() {
+		
+	}
+	
+	public Producto(String id) {
+		this.id = id;
+	}
 
 	public String getId() {
 		return id;

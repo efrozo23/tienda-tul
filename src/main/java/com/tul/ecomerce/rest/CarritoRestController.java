@@ -2,7 +2,9 @@ package com.tul.ecomerce.rest;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import javax.validation.Valid;
 
@@ -22,67 +24,79 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tul.ecomerce.EcomerceApplication;
+import com.tul.ecomerce.dao.ICarritoDAO;
 import com.tul.ecomerce.dao.IProductoDAO;
 import com.tul.ecomerce.dto.Response;
+import com.tul.ecomerce.model.Carrito;
 import com.tul.ecomerce.model.Producto;
 
 @RestController
-@RequestMapping("/producto")
-public class ProductoRestController {
+@RequestMapping("/carrito")
+public class CarritoRestController {
 	
-	
+	private ICarritoDAO iCarritoDAO;
 	private IProductoDAO iProductoDAO;
 	
-	public ProductoRestController(IProductoDAO iProductoDAO) {
-		
+	public CarritoRestController(ICarritoDAO iCarritoDAO,IProductoDAO iProductoDAO) {
+		this.iCarritoDAO = iCarritoDAO;
 		this.iProductoDAO = iProductoDAO;
-		
 	}
 	
 	@GetMapping("/listar")
-	public ResponseEntity<Response> listarProductos(){
+	public ResponseEntity<Response> listarCarrito(){
 		Response r = new Response();
 		r.setMensaje("OK");
-		r.setErrores(Arrays.asList());
-		r.setData(this.iProductoDAO.allProductos());
+		r.setData(this.iCarritoDAO.allCarrito());
 		return new ResponseEntity<>(r, HttpStatus.OK);
-		
 	}
 	
 	@PostMapping("/guardar")
-	public ResponseEntity<Response> guardar(@Valid @RequestBody Producto item){
+	public ResponseEntity<Response> guardar(@Valid @RequestBody Carrito car){
 		Response r = new Response();
-		Producto rP = this.iProductoDAO.guardarProducto(item);
-		r.setMensaje("OK");
-		r.setErrores(Arrays.asList());
-		r.setData(Arrays.asList(rP));
-		return new ResponseEntity<>(r, HttpStatus.CREATED);
+		
+		Optional<Carrito> carO = Optional.ofNullable(this.iCarritoDAO.guardar(car));
+		
+		if(carO.isPresent()) {
+			r.setMensaje("OK");
+			r.setData(Arrays.asList(this.iCarritoDAO.guardar(car)));
+			return new ResponseEntity<>(r, HttpStatus.CREATED);
+		}
+		r.setMensaje("ERROR");
+		r.setErrores(List.of("PRODUCTO NO ENCONTRADO"));
+		return new ResponseEntity<>(r, HttpStatus.BAD_REQUEST);
 		
 	}
 	
 	@PutMapping("/editar/{id}")
-	public ResponseEntity<Response> editar(@Valid @RequestBody Producto item,@PathVariable("id") String uid){
-		item.setId(uid);
+	public ResponseEntity<Response> editar(@PathVariable("id") String uuid,@Valid @RequestBody Carrito car){
 		Response r = new Response();
-		EcomerceApplication.logger.info("id ingresado: {}" , uid);
-		EcomerceApplication.logger.info("id ingresado dto: {}" , item.getId());
-		int result = this.iProductoDAO.editarProducto(item);
 		
-		EcomerceApplication.logger.info("Modificado: {}" , result);
-		r.setData(Arrays.asList());
-		r.setMensaje("OK");
-		r.setData(Arrays.asList(item));
-		r.setErrores(Arrays.asList());
-		if(result == 0) {
+		
+		boolean existeCarrito = this.iCarritoDAO.existeCarrito(uuid);
+		
+		if(!existeCarrito) {
 			r.setMensaje("ERROR");
-			r.setData(Arrays.asList());
-			r.setErrores(Arrays.asList("NO SE ENCONTRO EL PRODUCTO"));
+			r.setErrores(List.of("PRODUCTO NO ENCONTRADO"));
 			return new ResponseEntity<>(r, HttpStatus.BAD_REQUEST);
 		}
 		
-		return new ResponseEntity<>(r, HttpStatus.ACCEPTED);
+		Optional<Producto> producto = this.iProductoDAO.buscarProductoById(car.getIdProducto().getId());
+		
+		if(!producto.isPresent()) {
+			r.setMensaje("ERROR");
+			r.setErrores(List.of("PRODUCTO NO ENCONTRADO"));
+			return new ResponseEntity<>(r, HttpStatus.BAD_REQUEST);
+		}
+		
+		
+		Optional<Carrito> carO = Optional.ofNullable(this.iCarritoDAO.guardar(car));
+		
+		r.setMensaje("OK");
+		r.setData(Arrays.asList(carO.get()));
+		return new ResponseEntity<>(r, HttpStatus.CREATED);
 		
 	}
+	
 	
 	@DeleteMapping("/eliminar/{id}")
 	public ResponseEntity<Response> editar(@PathVariable("id") String uid){
@@ -90,7 +104,7 @@ public class ProductoRestController {
 		Response r = new Response();
 		EcomerceApplication.logger.info("id ingresado: {}" , uid);
 		r.setData(Arrays.asList());
-		boolean isDelete = this.iProductoDAO.deleteProducto(uid);
+		boolean isDelete = this.iCarritoDAO.deleteProducto(uid);
 		
 		if(isDelete) {
 			
@@ -103,9 +117,20 @@ public class ProductoRestController {
 		r.setMensaje("ERROR");
 		r.setErrores(Arrays.asList("NO SE ENCONTRO EL PRODUCTO"));
 		return new ResponseEntity<>(r, HttpStatus.BAD_REQUEST);
-		
-		
-		
+	}
+	
+	@GetMapping("/checkout")
+	public ResponseEntity<Response> getCheckout(){
+		Response r = new Response();
+		r.setMensaje("OK");
+		Map<String, String> mapTotal= this.iCarritoDAO.checkout();
+		EcomerceApplication.logger.info("TOTAL OBTENIDO:{}" , mapTotal.size());
+		r.setData(Arrays.asList(mapTotal));
+		if(mapTotal.isEmpty()) {
+			r.setData(Arrays.asList("NO HAY DATOS"));
+			
+		}
+		return new ResponseEntity<>(r,HttpStatus.OK);
 	}
 	
 	@ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -114,7 +139,6 @@ public class ProductoRestController {
 		EcomerceApplication.logger.info("INGRESO A VALIDAR EXECPCION");
 		Response r = new Response();
 		r.setMensaje("ERROR");
-		r.setData(Arrays.asList());
 		Map<String, String> errors = new HashMap<>();
 		ex.getBindingResult().getAllErrors().forEach((error) -> {
 	        String fieldName = ((FieldError) error).getField();
@@ -125,7 +149,5 @@ public class ProductoRestController {
 		return r;
 		
 	}
-	
-	
 
 }
